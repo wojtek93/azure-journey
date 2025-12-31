@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: aks-poc
-        image: wojtekacr.azurecr.io/aks-poc:v1
+        image: wojtekacr.azurecr.io/aks-poc:v2
         ports:
         - containerPort: 80
 ---
