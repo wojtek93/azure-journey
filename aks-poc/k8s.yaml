@@ -14,7 +14,11 @@ spec:
     spec:
       containers:
       - name: aks-poc
+<<<<<<< HEAD
         image: wojtekacr.azurecr.io/aks-poc:v2
+=======
+        image: wojtekacr.azurecr.io/aks-poc:v3
+>>>>>>> d5a6bbf (AKS PoC: deployment with replicas, rolling updates and ACR integration)
         ports:
         - containerPort: 80
 ---
