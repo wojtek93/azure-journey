@@ -45,8 +45,8 @@ jobs:
 
       - name: Get AKS credentials
         run: az aks get-credentials -g $RG -n $AKS_NAME --overwrite-existing
-
-      - name: Deploy (set image + rollout)
-        run: |
-          kubectl set image deployment/$DEPLOYMENT_NAME $CONTAINER_NAME=$IMAGE
+	
+      - name: Deploy (apply manifests)
+  	run: |
+          kubectl apply -f aks-poc/k8s.yaml
           kubectl rollout status deployment/$DEPLOYMENT_NAME
