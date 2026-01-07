@@ -1,6 +1,0 @@
-Azure Kubernetes Service (AKS) is a managed Kubernetes service provided by Microsoft Azure.
-It allows users to deploy, manage and scale containerized applications without managing
-the underlying control plane.
-
-AKS integrates with Azure services such as Azure Container Registry, Azure Monitor
-and Azure Active Directory.

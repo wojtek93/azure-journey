@@ -1,122 +1,238 @@
-# Azure Journey – AKS + Azure OpenAI PoC
+# Azure Journey — AKS + CI/CD + Azure OpenAI (RAG PoC)
 
-This repository contains a learning / proof-of-concept project demonstrating how to deploy
-a containerized backend application to Azure Kubernetes Service (AKS) and integrate it with
-Azure OpenAI.
+This repository contains a hands-on proof of concept demonstrating a complete
+cloud-native deployment on Microsoft Azure, including a working
+Retrieval-Augmented Generation (RAG) API.
 
-The project focuses on practical understanding of Azure, Kubernetes, CI/CD and AI services.
-It is not intended to be production-ready.
+The project shows how to build, deploy, and operate a containerized application
+on Azure Kubernetes Service (AKS) with CI/CD, cost control, and Azure OpenAI
+integration.
 
 ---
 
-## Architecture
+## What Is Implemented
 
-Client (browser / curl)
-→ Azure LoadBalancer (AKS Service)
-→ AKS Pod (containerized backend)
-→ Azure OpenAI (gpt-4o-mini)
+- Containerized Python backend (FastAPI-style API)
+- Azure Kubernetes Service (AKS)
+- Public exposure via Kubernetes LoadBalancer
+- CI/CD pipeline using GitHub Actions
+- Azure Container Registry (ACR)
+- Azure OpenAI (Chat Completions)
+- Document-based Q&A (RAG)
+- Azure Budget and cost monitoring
+
+---
+
+## Architecture Overview
+
+Client (curl / browser)  
+→ Azure LoadBalancer (Kubernetes Service)  
+→ AKS Pod (Python API)  
+→ Azure OpenAI (Chat / RAG)
+
+---
+
+## Repository Structure
+
+```text
+.
+├── aks-poc/
+│   ├── app.py
+│   ├── Dockerfile
+│   ├── deployment.yaml
+│   └── service.yaml
+├── docs/
+│   └── source.txt
+├── .github/
+│   └── workflows/
+│       └── deploy-aks.yml
+└── README.md
+```
 
 ---
 
 ## Deployed API
 
-The application is deployed to AKS and exposed publicly using a Kubernetes Service
-of type LoadBalancer.
+The application is deployed to Azure Kubernetes Service (AKS) and exposed
+publicly using a Kubernetes Service of type `LoadBalancer`.
+
+### Available Endpoints
+
+- `GET /health`
+  - Simple health check
+- `POST /chat`
+  - Free-form chat using Azure OpenAI
+- `POST /rag`
+  - Answers questions **only** using the document in `docs/source.txt`
 
 ---
 
-## Finding the External IP (AKS)
+## How to Get the External IP (AKS)
 
-To retrieve the public IP address of the application:
+After deployment, retrieve the public IP address:
 
-kubectl get svc
+```bash
+kubectl get svc aks-poc-svc
+```
 
-Look for the service with TYPE = LoadBalancer and copy the value from the EXTERNAL-IP column.
+Example output:
 
-Example:
-NAME           TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)
-aks-poc-svc    LoadBalancer   10.0.145.123   20.82.xxx.xxx   80:31234/TCP
+```text
+NAME           TYPE           CLUSTER-IP     EXTERNAL-IP       PORT(S)
+aks-poc-svc    LoadBalancer   10.0.179.220   134.xxx.xxx.xxx  80:30225/TCP
+```
 
 The application is available at:
+
+```text
 http://<EXTERNAL-IP>
+```
 
 ---
 
-### Health check
+## How to Test the Application
 
-Endpoint:
-GET /health
+### Health Check
 
-Example:
+```bash
 curl http://<EXTERNAL-IP>/health
+```
+
+Expected response:
+
+```json
+{ "status": "ok" }
+```
 
 ---
 
-### Chat endpoint (Azure OpenAI)
+### Chat Endpoint (Azure OpenAI)
 
-Endpoint:
-POST /chat
-
-Example:
+```bash
 curl -X POST http://<EXTERNAL-IP>/chat \
--H "Content-Type: application/json" \
--d '{"text":"Napisz jedno zdanie po polsku, że Azure OpenAI działa."}'
+  -H "Content-Type: application/json" \
+  -d '{"text":"Write one sentence confirming Azure OpenAI works."}'
+```
+
+---
+
+## RAG — Document-Based Q&A (WORKING EXAMPLE)
+
+The RAG endpoint answers **only if the information exists in `docs/source.txt`**.
+
+### Document Content
+
+File: `docs/source.txt`
+
+```text
+Azure Kubernetes Service (AKS) is a managed Kubernetes service provided by Microsoft Azure.
+It allows users to deploy, manage and scale containerized applications without managing
+the underlying control plane.
+
+AKS integrates with Azure services such as Azure Container Registry, Azure Monitor
+and Azure Active Directory.
+```
+
+---
+
+### Ask a Question Answerable From the Document
+
+```bash
+curl -X POST http://<EXTERNAL-IP>/rag \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What is Azure Kubernetes Service (AKS)?"}'
+```
 
 Example response:
+
+```json
 {
-  "answer": "Azure OpenAI działa poprawnie i umożliwia przetwarzanie języka naturalnego."
+  "answer": "Azure Kubernetes Service (AKS) is a managed Kubernetes service provided by Microsoft Azure that allows users to deploy, manage, and scale containerized applications without managing the underlying control plane.",
+  "source": "docs/source.txt"
 }
+```
+
+✅ Answer comes **directly from the document**  
+✅ Source is explicitly returned
 
 ---
 
-## Azure OpenAI Integration
+### Ask a Question NOT Covered by the Document
 
-Service: Azure OpenAI  
-Model: gpt-4o-mini  
-Deployment name: gpt-chat  
-Authentication: API Key  
-Configuration: environment variables  
+```bash
+curl -X POST http://<EXTERNAL-IP>/rag \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What is the weather today?"}'
+```
 
-The backend application communicates directly with the Azure OpenAI endpoint.
-Secrets are not stored in the repository.
+Example response:
+
+```json
+{
+  "answer": "I do not know based on the provided document.",
+  "source": "docs/source.txt"
+}
+```
+
+✅ No hallucination  
+✅ Strict document grounding
 
 ---
 
-## CI/CD
+## Azure OpenAI Configuration
 
-The project uses GitHub Actions for automated deployment to AKS.
+- Service: Azure OpenAI
+- Model: `gpt-4o-mini`
+- Deployment name: `gpt-chat`
+- Authentication: API Key
+- API access via environment variables
 
-The pipeline:
-- builds the container image
-- authenticates to Azure using a Service Principal
-- pushes the image to Azure Container Registry (ACR)
-- deploys the application to AKS
+Secrets are injected using:
+- GitHub Actions
+- Kubernetes Secrets
 
-Workflow definitions are located in the .github/workflows directory.
+No secrets are stored in the repository.
+
+---
+
+## CI/CD Pipeline
+
+Automated deployment using GitHub Actions:
+
+1. Azure login via Service Principal
+2. Docker image build
+3. Push image to Azure Container Registry (ACR)
+4. Fetch AKS credentials
+5. Deploy to AKS
+6. Rolling update with health checks
+
+Workflow file:
+
+```text
+.github/workflows/deploy-aks.yml
+```
 
 ---
 
 ## Cost Control
 
-An Azure Budget is configured to prevent unexpected costs.
+This project runs under an Azure subscription with an active budget and alerts.
 
-Monthly budget: 50 USD  
-Alerts at: 50%, 80%, 100%  
-The budget applies to all services in the subscription, including Azure OpenAI.
-
----
-
-## Disclaimer
-
-This project is for learning and experimentation purposes only.
-It omits production concerns such as authentication, authorization,
-rate limiting and persistent storage.
+Recommendations:
+- Monitor Azure Cost Management regularly
+- Delete resources when not in use:
+  - AKS cluster
+  - Azure Container Registry
+  - Azure OpenAI resource
 
 ---
 
-## Next Steps
+## Purpose
 
-- Document ingestion
-- Retrieval-Augmented Generation (RAG)
-- Vector database integration
-- API authentication
+This project is intended as:
+
+- a learning journey
+- a portfolio proof of concept
+- a demonstration of real Azure + Kubernetes + AI skills
+
+It is **not production-ready** by design and focuses on clarity and learning.
